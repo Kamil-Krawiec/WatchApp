@@ -1,2 +1,3 @@
-# WatchApp
-StressApp for WatchOS and IOS
+## Documentation
+- [Project Initiation](INIT.md)
+- [Project Planning](PLAN.md)
