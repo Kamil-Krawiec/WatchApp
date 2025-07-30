@@ -12,8 +12,8 @@
 ### 1.2 Work Packages (WPs)
 | Week | Phase                          | Goal / Focus                                   | Key Tasks & Deliverables                                                                 | Status        |
 |------|--------------------------------|------------------------------------------------|-------------------------------------------------------------------------------------------|---------------|
-| 1    | Planning & Initiating (NOW)    | Define WHY/WHAT and set up the project         | • Finalize INIT.md & PLAN.md<br>• Create Xcode projects (watchOS + iOS)<br>• Draft user stories & WPs<br>• Outline architecture & data flow | ☐ Not started |
-| 2    | Executing                      | Build core features (stress calc + watch UI)   | • Implement StressCalc module (HRV → score)<br>• Build Watch current-stress screen<br>• Set up local storage layer | ☐ Not started |
+| 1    | Planning & Initiating (NOW)    | Define WHY/WHAT and set up the project         | • Finalize INIT.md & PLAN.md<br>• Create Xcode projects (watchOS + iOS)<br>• Draft user stories & WPs<br>• Outline architecture & data flow | Finished |
+| 2    | Executing                      | Build core features (stress calc + watch UI)   | • Implement StressCalc module (HRV → score)<br>• Build Watch current-stress screen<br>• Set up local storage layer | started |
 | 3    | Testing & Monitoring           | Validate logic, sync, and UX                   | • Implement sync via WatchConnectivity<br>• Unit/integration tests (calc, sync)<br>• Manual QA checklist run | ☐ Not started |
 | 4    | Closing                        | Polish, document, and wrap MVP                  | • Fix bugs & UI polish<br>• Update README/Docs (usage, lessons learned)<br>• Tag release v0.1.0 | ☐ Not started |
 
