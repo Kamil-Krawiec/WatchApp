@@ -1,14 +1,14 @@
 //
 //  StressAppApp.swift
-//  StressApp Watch App
+//  StressApp
 //
-//  Created by Kamil Krawiec on 29/07/2025.
+//  Created by Kamil Krawiec on 22/07/2025.
 //
 
 import SwiftUI
 
 @main
-struct StressApp_Watch_AppApp: App {
+struct StressAppApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
