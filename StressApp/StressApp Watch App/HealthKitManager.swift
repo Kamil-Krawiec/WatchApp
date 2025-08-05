@@ -129,68 +129,71 @@ final class HealthKitManager: NSObject, ObservableObject {
         healthStore.execute(query)
     }
 
-    // MARK: - Sleep Analysis Fetch (Fixed)
-    /// Fetch sleep duration for the last night in hours,
-    /// including all “asleep” phases (core, deep, REM, etc).
+    // MARK: - Sleep Analysis Fetch (Single Main Session)
+    /// Fetch the last night’s main sleep session (e.g. ~10 pm → ~8 am) and return its duration in hours.
     func fetchSleepDuration(completion: @escaping (Double?) -> Void) {
         guard let type = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else {
-            print("⚠️ SleepAnalysis type unavailable")
             DispatchQueue.main.async { completion(nil) }
             return
         }
 
-        let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: Date()).addingTimeInterval(-86400)
+        // Query the last 36 hours to be sure we span the previous evening → this morning
+        let now = Date()
+        let startWindow = Calendar.current.date(byAdding: .hour, value: -36, to: now)!
         let predicate = HKQuery.predicateForSamples(
-            withStart: startOfDay,
-            end: Date(),
-            options: [.strictStartDate]
+            withStart: startWindow,
+            end: now,
+            options: [.strictStartDate, .strictEndDate]
         )
 
         let query = HKSampleQuery(
             sampleType: type,
             predicate: predicate,
             limit: HKObjectQueryNoLimit,
-            sortDescriptors: nil
+            sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
         ) { _, results, error in
             if let error = error {
                 print("❌ fetchSleepDuration error:", error)
                 DispatchQueue.main.async { completion(nil) }
                 return
             }
-            guard let sleeps = results as? [HKCategorySample] else {
-                print("⚠️ fetchSleepDuration: no samples returned")
+            guard let sleeps = results as? [HKCategorySample], !sleeps.isEmpty else {
+                print("⚠️ fetchSleepDuration: no samples in window")
                 DispatchQueue.main.async { completion(nil) }
                 return
             }
 
-            // Print out each sample with human‐readable phase
-            for sample in sleeps {
-                let phase: String
-                switch sample.value {
-                case HKCategoryValueSleepAnalysis.inBed.rawValue:
-                    phase = "inBed"
-                case HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue:
-                    phase = "asleepUnspecified"
-                case HKCategoryValueSleepAnalysis.asleepCore.rawValue:
-                    phase = "asleepCore"
-                case HKCategoryValueSleepAnalysis.asleepDeep.rawValue:
-                    phase = "asleepDeep"
-                case HKCategoryValueSleepAnalysis.asleepREM.rawValue:
-                    phase = "asleepREM"
-                default:
-                    phase = "unknown(\(sample.value))"
+            // Keep only the actual "asleep" phases (value >= 1)
+            let asleepSamples = sleeps.filter { $0.value >= HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue }
+
+            // Group into contiguous sessions (gap ≤ 30 min)
+            let gapThreshold: TimeInterval = 30 * 60
+            var sessions: [[HKCategorySample]] = []
+            for sample in asleepSamples {
+                if var lastSession = sessions.last,
+                   let prev = lastSession.last,
+                   sample.startDate.timeIntervalSince(prev.endDate) <= gapThreshold {
+                    // extend current session
+                    lastSession.append(sample)
+                    sessions[sessions.count-1] = lastSession
+                } else {
+                    // start a new session
+                    sessions.append([sample])
                 }
-                print("  • \(sample.startDate) → \(sample.endDate) [\(phase)]")
             }
 
-            // Include *all* asleep phases (value >= 1)
-            let totalSeconds = sleeps
-                .filter { $0.value >= HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue }
-                .reduce(0.0) { $0 + $1.endDate.timeIntervalSince($1.startDate) }
+            // Find the session with the largest total duration
+            func sessionDuration(_ session: [HKCategorySample]) -> TimeInterval {
+                return session.reduce(0) { $0 + $1.endDate.timeIntervalSince($1.startDate) }
+            }
+            guard let mainSession = sessions.max(by: { sessionDuration($0) < sessionDuration($1) }) else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
 
+            // Sum up that session's durations
+            let totalSeconds = sessionDuration(mainSession)
             let hours = totalSeconds / 3600
-            print("🕒 Calculated sleep hours:", hours)
 
             DispatchQueue.main.async { completion(hours) }
         }
