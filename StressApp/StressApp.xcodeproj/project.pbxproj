@@ -380,7 +380,6 @@
 				INFOPLIST_FILE = "StressApp-Watch-App-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = StressApp;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "We need your HRV and pulse to estimate stress levels";
-				INFOPLIST_KEY_NSHomeKitUsageDescription = "We need your HRV and pulse to estimate stress levels";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "";
 				"INFOPLIST_KEY_UISupportedInterfaceOrientations[sdk=watchos*]" = "";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = KamilApps.StressApp;
@@ -414,7 +413,6 @@
 				INFOPLIST_FILE = "StressApp-Watch-App-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = StressApp;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "We need your HRV and pulse to estimate stress levels";
-				INFOPLIST_KEY_NSHomeKitUsageDescription = "We need your HRV and pulse to estimate stress levels";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = KamilApps.StressApp;
 				LD_RUNPATH_SEARCH_PATHS = (

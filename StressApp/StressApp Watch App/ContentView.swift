@@ -1,29 +1,30 @@
-//
-//  ContentView.swift
-//  StressApp Watch App
-//
-//  Created by Kamil Krawiec on 04/06/2025.
-//
-
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var healthKitManager = HealthKitManager()
+    @StateObject private var healthKitManager: HealthKitManager
     @State private var statusMessage: String = "Requesting authorization…"
     @State private var isLoading: Bool = false
+
+    init(manager: HealthKitManager = HealthKitManager()) {
+        _healthKitManager = StateObject(wrappedValue: manager)
+    }
 
     /// Determine color for stress category
     private func stressColor(_ category: StressCategory?) -> Color {
         switch category {
-        case .low:
-            return .green
-        case .moderate:
-            return .orange
-        case .high:
-            return .red
-        default:
-            return .gray
+        case .low:      return .green
+        case .moderate: return .orange
+        case .high:     return .red
+        default:        return .gray
         }
+    }
+
+    /// Format sleep hours into "xh ym"
+    private func formatSleep(_ hoursDecimal: Double) -> String {
+        let totalMinutes = Int(hoursDecimal * 60)
+        let h = totalMinutes / 60
+        let m = totalMinutes % 60
+        return "\(h)h \(m)m"
     }
 
     var body: some View {
@@ -33,7 +34,6 @@ struct ContentView: View {
                     Text("Stress Predictor")
                         .font(.headline)
 
-                    // Show latest HRV & heart rate if available
                     if let hrv = healthKitManager.latestHRV {
                         Text("HRV: \(Int(hrv)) ms")
                             .font(.title3)
@@ -52,7 +52,15 @@ struct ContentView: View {
                             .foregroundColor(.gray)
                     }
 
-                    // Show computed stress level and category
+                    if let sleep = healthKitManager.latestSleepDuration {
+                        Text("Sleep: \(formatSleep(sleep))")
+                            .font(.title3)
+                    } else {
+                        Text("Sleep: —")
+                            .font(.title3)
+                            .foregroundColor(.gray)
+                    }
+
                     if let level = healthKitManager.latestStressLevel {
                         HStack(spacing: 4) {
                             Circle()
@@ -75,13 +83,13 @@ struct ContentView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
 
-                    Button(action: {
+                    Button {
                         isLoading = true
                         healthKitManager.fetchLatestData()
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                             isLoading = false
                         }
-                    }) {
+                    } label: {
                         if isLoading {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle())
@@ -116,5 +124,14 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    ContentView(manager: {
+        let manager = HealthKitManager()
+        manager.latestHRV = 55.0
+        manager.latestHeartRate = 65.0
+        manager.latestSleepDuration = 7.75  // 7h 45m
+        manager.latestStressLevel = 42.0
+        manager.latestStressCategory = .moderate
+        manager.authorizationSucceeded = true
+        return manager
+    }())
 }
