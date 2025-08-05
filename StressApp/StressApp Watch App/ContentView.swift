@@ -3,6 +3,7 @@
 //  StressApp Watch App
 //
 //  Created by Kamil Krawiec on 04/06/2025.
+//  Updated to display sleep duration
 //
 
 import SwiftUI
@@ -33,7 +34,7 @@ struct ContentView: View {
                     Text("Stress Predictor")
                         .font(.headline)
 
-                    // Show latest HRV & heart rate if available
+                    // Show latest HRV if available
                     if let hrv = healthKitManager.latestHRV {
                         Text("HRV: \(Int(hrv)) ms")
                             .font(.title3)
@@ -43,11 +44,22 @@ struct ContentView: View {
                             .foregroundColor(.gray)
                     }
 
+                    // Show latest heart rate if available
                     if let hr = healthKitManager.latestHeartRate {
                         Text("HR: \(Int(hr)) bpm")
                             .font(.title3)
                     } else {
                         Text("HR: —")
+                            .font(.title3)
+                            .foregroundColor(.gray)
+                    }
+
+                    // ADDED: Show sleep duration if available
+                    if let sleep = healthKitManager.latestSleepDuration {
+                        Text("Sleep: \(String(format: "%.1f", sleep)) hrs")
+                            .font(.title3)
+                    } else {
+                        Text("Sleep: —")
                             .font(.title3)
                             .foregroundColor(.gray)
                     }
