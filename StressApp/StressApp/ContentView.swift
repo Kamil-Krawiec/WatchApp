@@ -28,6 +28,15 @@ struct ContentView: View {
         }
     }
 
+    /// Format hours as "xh ym" for display
+    private func formatSleep(_ hours: Double?) -> String {
+        guard let hours = hours else { return "--" }
+        let totalMinutes = Int((hours * 60).rounded())
+        let h = totalMinutes / 60
+        let m = totalMinutes % 60
+        return "\(h)h \(m)m"
+    }
+
     var body: some View {
         NavigationView {
             VStack(spacing: 16) {
@@ -48,6 +57,11 @@ struct ContentView: View {
                                 .font(.title3)
                         }
                         HStack {
+                            Image(systemName: "bed.double.fill")
+                            Text(formatSleep(sample.sleepDuration))
+                                .font(.title3)
+                        }
+                        HStack {
                             Image(systemName: "flame.fill")
                                 .foregroundColor(stressColor(sample.stressCategory))
                             Text("\(Int(sample.stressLevel))")
@@ -57,19 +71,23 @@ struct ContentView: View {
                         }
                         Text(sample.stressCategory.rawValue.capitalized)
                             .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(stressColor(sample.stressCategory).opacity(0.2))
-                            .cornerRadius(8)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(stressColor(sample.stressCategory).opacity(0.2), in: Capsule())
                     }
                 } else {
                     Text("No data synced yet.")
                         .foregroundColor(.gray)
                 }
 
-                Button("Refresh from Watch") {
-                    // Force reload from storage
-                    connectivity.reloadSamples()
+                Button(action: {
+                    // Ask the watch to send anything missing, then reload shortly after
+                    connectivity.requestCatchUp()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        connectivity.reloadSamples()
+                    }
+                }) {
+                    Label("Sync & Refresh", systemImage: "arrow.clockwise")
                 }
                 .padding()
                 .background(Color.accentColor.opacity(0.1))
