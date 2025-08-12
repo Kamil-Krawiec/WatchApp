@@ -1,94 +1,139 @@
-# Project Planning
+# Project Planning _(v2 – 2025-08-12)_
+
+## 0. What’s New in v2
+- **iOS: `Sleep Duration`** in _Latest metrics_ (format: `xh ym` / `--`).
+- **iOS: `Sync & Refresh`** – ordering: **`requestCatchUp()` → `reloadSamples()`** (fresher data and more reliable startup).
+- **UI:** colored **capsule** for stress category (faster scanning).
+- **Cleanup (iOS):** legacy `HealthKitManager` removed on iOS; HealthKit handled on watchOS.
 
 ---
 
 ## 1. Work Packages & User Stories
 
-### 1.1 User Stories
-- US-01: As a user, I want to see my current stress level on Apple Watch, so I can quickly assess how I feel.
-- US-02: As a user, I want to view a history chart on iPhone, so I can track trends over time.
-- US-03: As a user, I want my data synced between watch and phone, so I never lose measurements.
+### 1.1 User Stories (status @ v2)
+- **US-01 — Current stress on Apple Watch:** **Met**  
+  Measure on the watch with raw metrics (**HRV ms**, **HR bpm**) and category color.
+- **US-02 — History on iPhone:** **Met (MVP)**  
+  List / _Latest metrics_ view; **instead of a chart** → a history screenshot:  
+  _Screenshot:_ **[iOS — history (7 days)](docs/img/ios_history_7d_v2.png)** ← replace with actual path
+- **US-03 — Sync watch ↔ iPhone:** **Met (manual trigger)**  
+  iOS `Sync & Refresh`: **`requestCatchUp()` → `reloadSamples()`**; offline retry — **basic** (to verify).
 
 ### 1.2 Work Packages (WPs)
-| Week | Phase                          | Goal / Focus                                   | Key Tasks & Deliverables                                                                 | Status        |
-|------|--------------------------------|------------------------------------------------|-------------------------------------------------------------------------------------------|---------------|
-| 1    | Planning & Initiating (NOW)    | Define WHY/WHAT and set up the project         | • Finalize INIT.md & PLAN.md<br>• Create Xcode projects (watchOS + iOS)<br>• Draft user stories & WPs<br>• Outline architecture & data flow | Finished |
-| 2    | Executing                      | Build core features (stress calc + watch UI)   | • Implement StressCalc module (HRV → score)<br>• Build Watch current-stress screen<br>• Set up local storage layer | started |
-| 3    | Testing & Monitoring           | Validate logic, sync, and UX                   | • Implement sync via WatchConnectivity<br>• Unit/integration tests (calc, sync)<br>• Manual QA checklist run | ☐ Not started |
-| 4    | Closing                        | Polish, document, and wrap MVP                  | • Fix bugs & UI polish<br>• Update README/Docs (usage, lessons learned)<br>• Tag release v0.1.0 | ☐ Not started |
+
+| Week | Phase                  | Goal / Focus                                   | Key Tasks & Deliverables                                                                                 | Status               |
+|-----:|------------------------|------------------------------------------------|-----------------------------------------------------------------------------------------------------------|----------------------|
+| 1    | Planning & Initiating  | Define WHY/WHAT, bootstrap                     | INIT.md & PLAN.md; Xcode projects (watchOS + iOS); user stories & WPs; draft architecture / data flow    | **Done**             |
+| 2    | Executing              | Core features (stress calc + watch UI)         | StressCalc (HRV→score); Watch current-stress screen; lightweight local storage                           | **Done**             |
+| 3    | Testing & Monitoring   | Validate logic, sync, UX                       | WatchConnectivity; manual QA (permissions, first-launch, no-data); unit consistency & UI responsiveness  | **Done (manual QA)** |
+| 4    | Closing (MVP → v2)     | Polish, docs, release                          | iOS: Sleep row; **Sync & Refresh (`catchUp`→`reload`)**; category capsule; README/Docs; tag **v2**       | **Done**             |
+
+> **Note (shared code):** Keep models (`StressSample`, `StressCategory`) in a **single Shared module** with _Target Membership_ enabled for both watchOS and iOS to avoid duplication.
 
 ---
 
-## 2. Architecture & Data Flow
+## 2. Architecture & Data Flow (v2)
 
-- **Layers:**  
-  - Presentation: SwiftUI views on watchOS & iOS  
-  - Domain: Stress calculation (HRV, heart rate → score)  
-  - Data: HealthKit fetchers, local store, sync bridge  
+**Layers**
+- **Presentation:** SwiftUI (watchOS + iOS)  
+- **Domain:** Stress calc (HRV/HR → score/category)  
+- **Data:** HealthKit fetchers (watchOS), lightweight local storage, WatchConnectivity (event-driven), iOS “Sync & Refresh”
 
-- **Data Flow:** HealthKit → StressCalc → Local Store → Sync → UI
+**High-level flow:**  
+HealthKit _(watch)_ → StressCalc → **Local Store (watch)** → WatchConnectivity → **Local Store (iOS)** → iOS UI (_Latest metrics_)
 
----
+**Sequence (iOS sync – v2)**
+~~~mermaid
+sequenceDiagram
+    participant Watch as watchOS App
+    participant WC as WatchConnectivity
+    participant iOS as iOS App
 
-## 3. Definition of Done (DoD)
+    iOS->>Watch: requestCatchUp()   # fetch latest samples from watch
+    Watch-->>iOS: latest samples
+    iOS->>iOS: reloadSamples()      # update local store + publish UI
+~~~
 
-| Area                 | DoD Criteria                                                                 |
-|----------------------|-------------------------------------------------------------------------------|
-| Feature Implementation | Acceptance criteria met                             |
-| UI/UX                | Works on watchOS 10+ & iOS 17+, no clipping/layout issues                     |
-| Data Sync            | Same data visible on both devices after sync trigger                          |
-| Documentation        | README + INIT + PLAN updated                                                  |
+**End-to-end (storage & presentation)**
+~~~mermaid
+flowchart LR
+    HK[(HealthKit HRV, HR)] --> WApp[watchOS App]
+    WApp -->|query helpers| Sample["StressSample (date, hrvMs, hrBpm, category)"]
+    Sample --> WStore[(Local Store watch JSON)]
+    WApp -->|WCSession| Phone[iOS App]
+    Phone --> IStore[(Local Store iOS JSON)]
+    IStore --> UIiOS["iOS UI Latest metrics: HRV • HR • Sleep • Category capsule"]
 
----
-
-## 4. Acceptance Criteria (per Story)
-
-**US-01 (Current stress on Watch):**  
-- [ ] Tapping “Measure” returns a stress value in <3s  
-- [ ] Error messaging for HealthKit denial  
-- [ ] Raw metrics (e.g., HRV) accessible/visible via UI
-
-**US-02 (History on iPhone):**  
-- [ ] Chart shows last 7 days minimum  
-- [ ] List view scrollable with timestamps  
-- [ ] New measurement appears after sync without app restart
-
-**US-03 (Sync across devices):**  
-- [ ] Measurement on watch appears on iPhone within one sync cycle  
-- [ ] Offline handling: data queued and sent when connectivity resumes
+~~~
 
 ---
 
-## 5. Testing Strategy
+## 3. Definition of Done (DoD) — v2
 
-- **Manual QA Checklist:**  
-  - Permission denied scenario  
-  - First-launch with no data  
-  - Airplane mode sync retry  
-- **Tools:** real Apple Watch + iPhone
+| Area                   | DoD Criteria                                                          | v2 Status                        |
+|------------------------|------------------------------------------------------------------------|-----------------------------------|
+| Feature Implementation | Acceptance criteria met                                                | **US-01/03 met; US-02 met (MVP)** |
+| UI/UX                  | watchOS 10+ / iOS 17+, no clipping; explicit units                    | **OK**                            |
+| Data Sync              | Same data on both devices after sync trigger                           | **OK (manual trigger)**           |
+| Documentation          | README + INIT + PLAN updated                                           | **OK (PLAN v2)**                  |
+
+---
+
+## 4. Acceptance Criteria (by Story) — with v2 check
+
+**US-01 — Watch (current stress)**
+- [x] Tapping “Measure” returns a result in ~< 3 s (typical)
+- [x] Error state when HealthKit is denied (verify messaging path)
+- [x] Raw metrics visible: **HRV (ms)**, **HR (bpm)** + **category color**
+
+**US-02 — iPhone (history)**
+- [x] List / timeline + _Latest metrics_  
+- [x] New measurement appears after sync (no app restart)  
+- [x] Different time periods accessable
+
+**US-03 — Sync across devices**
+- [x] Measurement from watch appears on iPhone within one sync cycle  
+- [x] iOS: `Sync & Refresh` = **`requestCatchUp()` → `reloadSamples()`**  
+- [] Offline handling not tested
+
+---
+
+## 5. Testing Strategy (v2)
+
+**Manual QA (executed):**
+- ✅ HealthKit denied → sensible fallback
+- ✅ First-launch / no-data → `--` for Sleep (`formatSleep(_:)`)
+- ✅ Sync after relaunch; `catchUp → reload` prevents empty lists on startup
+
+**Devices:** real Apple Watch + iPhone
 
 ---
 
 ## 6. Release & Versioning
-
-- **Version:** `v0.1.0` for MVP  
-- **Distribution:** Local via Xcode 
-- **Git:** Tag releases (`v0.1.0`, `v0.2.0`, ...)
+- **Current:** **`v2` – Final app version MVP (2025-08-12)**  
+- **Distribution:** local via Xcode  
+- **Tags:** `v0.1.0` (MVP), `v1.1.x`, **`v2`**
 
 ---
 
 ## 7. Communication & Workflow
+- **Workflow:** GitHub Issues → feature branches → PR → merge  
+- **Docs:** Keep README/INIT/PLAN aligned with release notes  
+- **Self-review:** final retro @ v2 (Done / Blocked / Next)
 
-- **Workflow:** GitHub Issues → Feature branches → PR → Merge  
-- **Docs:** Update INIT/PLAN when scope or architecture shifts  
-- **Self Review:** Weekly mini-retro: Done / Blocked / Next
+---
+
+## 8. Closure Checklist (final)
+- [x] All MVP work packages merged  
+- [x] INIT.md success criteria met for MVP scope  
+- [x] README/usage + “What’s New in v2” updated  
+- [x] Tag **v2** and **close Apple Watch series**
 
 ---
 
-## 8. Closure Checklist (preview)
-
-- [ ] All WPs complete & checked in  
-- [ ] Success criteria from INIT.md met  
-- [ ] README usage section written  
-
----
+## 9. Backlog / De-scoped (future ideas)
+- **watch Complication** (category color)
+- **watch mini-chart** (last N measurements)
+- **iPhone:** full 7-day chart (optional)
+- Automated tests for sync & permissions paths
+- Battery profiling + debounced auto-updates
