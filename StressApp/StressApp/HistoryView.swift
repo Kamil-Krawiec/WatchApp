@@ -12,6 +12,7 @@ import Charts  // iOS 16+
 struct IOSHistoryView: View {
     @StateObject private var connectivity = ConnectivityManager.shared
     @State private var selectedRange: TimeRange = .all
+    @State private var isSyncing: Bool = false
 
     // Time range options
 enum TimeRange: String, CaseIterable, Identifiable {
@@ -53,11 +54,38 @@ enum TimeRange: String, CaseIterable, Identifiable {
         return levels.reduce(0, +) / Double(levels.count)
     }
 
+    private var minStress: Double {
+        filteredSamples.map { $0.stressLevel }.min() ?? 0
+    }
+
+    private var maxStress: Double {
+        filteredSamples.map { $0.stressLevel }.max() ?? 0
+    }
+
+    private var sampleCount: Int {
+        filteredSamples.count
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Stress History")
-                .font(.largeTitle)
-                .bold()
+            HStack {
+                Text("Stress History")
+                    .font(.largeTitle)
+                    .bold()
+                Spacer()
+                Button {
+                    isSyncing = true
+                    connectivity.requestCatchUp()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        connectivity.reloadSamples()
+                        isSyncing = false
+                    }
+                } label: {
+                    Label("Sync", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.bordered)
+                .disabled(isSyncing)
+            }
 
             // Range picker
             Picker("Range", selection: $selectedRange) {
@@ -70,18 +98,56 @@ enum TimeRange: String, CaseIterable, Identifiable {
 
             // Chart
             if #available(iOS 16.0, *) {
-                Chart(filteredSamples) { sample in
-                    LineMark(
-                        x: .value("Time", sample.date),
-                        y: .value("Stress", sample.stressLevel)
-                    )
-                    .interpolationMethod(.catmullRom)
-                    .foregroundStyle(.pink.gradient)
+                Chart {
+                    // Area fill for a cleaner look
+                    ForEach(filteredSamples) { sample in
+                        AreaMark(
+                            x: .value("Time", sample.date),
+                            y: .value("Stress", sample.stressLevel)
+                        )
+                        .foregroundStyle(.pink.opacity(0.15))
+                    }
+
+                    // Main line
+                    ForEach(filteredSamples) { sample in
+                        LineMark(
+                            x: .value("Time", sample.date),
+                            y: .value("Stress", sample.stressLevel)
+                        )
+                        .interpolationMethod(.catmullRom)
+                        .foregroundStyle(.pink)
+                    }
+
+                    // Threshold guides
+                    RuleMark(y: .value("Moderate", 50))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4]))
+                        .foregroundStyle(.gray.opacity(0.5))
+                    RuleMark(y: .value("High", 75))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4]))
+                        .foregroundStyle(.gray.opacity(0.5))
+
+                    // Latest point marker with annotation
+                    if let last = filteredSamples.last {
+                        PointMark(
+                            x: .value("Time", last.date),
+                            y: .value("Stress", last.stressLevel)
+                        )
+                        .symbolSize(60)
+                        .foregroundStyle(.pink)
+                        .annotation(position: .topTrailing) {
+                            Text("\(Int(last.stressLevel))")
+                                .font(.caption2).bold()
+                                .padding(6)
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
+                        }
+                    }
                 }
                 .chartYScale(domain: stressRange)
                 .chartXAxis {
-                    AxisMarks(values: .stride(by: .hour, count: selectedRange == .last24h ? 6 : 24)) {
-                        AxisGridLine(); AxisTick(); AxisValueLabel(format: .dateTime.hour().minute())
+                    AxisMarks(values: .automatic(desiredCount: selectedRange == .last24h ? 6 : (selectedRange == .last7d ? 8 : 10))) {
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel(format: .dateTime.hour().minute())
                     }
                 }
                 .chartYAxis {
@@ -89,18 +155,21 @@ enum TimeRange: String, CaseIterable, Identifiable {
                 }
                 .frame(height: 200)
                 .padding(.horizontal)
-            }
 
-            // Summary
-            HStack {
-                Text("Average:")
-                    .font(.headline)
-                Spacer()
-                Text("\(Int(averageStress))")
-                    .font(.headline)
-                    .foregroundColor(.pink)
+            HStack(spacing: 12) {
+                StatChip(title: "Avg", value: Int(averageStress).description)
+                StatChip(title: "Min", value: Int(minStress).description)
+                StatChip(title: "Max", value: Int(maxStress).description)
+                StatChip(title: "Pts", value: sampleCount.description)
             }
             .padding(.horizontal)
+            }
+
+            // Summary (compact)
+            Text("Average: \(Int(averageStress))")
+                .font(.headline)
+                .foregroundColor(.pink)
+                .padding(.horizontal)
 
             // List
             List {
@@ -109,9 +178,7 @@ enum TimeRange: String, CaseIterable, Identifiable {
                         VStack(alignment: .leading) {
                             Text(dateFormatter.string(from: sample.date))
                                 .font(.subheadline)
-                            Text(sample.stressCategory.rawValue.capitalized)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                            categoryPill(for: sample.stressCategory)
                         }
                         Spacer()
                         Text("\(Int(sample.stressLevel))")
@@ -126,6 +193,36 @@ enum TimeRange: String, CaseIterable, Identifiable {
         .padding(.top)
         .onAppear {
             connectivity.reloadSamples()
+        }
+    }
+
+    private func categoryPill(for category: StressCategory) -> some View {
+        let (label, color): (String, Color) = {
+            switch category {
+            case .low: return ("Low", .green)
+            case .moderate: return ("Moderate", .orange)
+            case .high: return ("High", .red)
+            }
+        }()
+        return Text(label)
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(color.opacity(0.15), in: Capsule())
+            .foregroundColor(color)
+    }
+
+    private struct StatChip: View {
+        let title: String
+        let value: String
+        var body: some View {
+            HStack(spacing: 6) {
+                Text(title).font(.caption2).foregroundStyle(.secondary)
+                Text(value).font(.caption).bold()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.thinMaterial, in: Capsule())
         }
     }
 }
