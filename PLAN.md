@@ -15,7 +15,6 @@
   Measure on the watch with raw metrics (**HRV ms**, **HR bpm**) and category color.
 - **US-02 — History on iPhone:** **Met (MVP)**  
   List / _Latest metrics_ view; **instead of a chart** → a history screenshot:  
-  _Screenshot:_ **[iOS — history (7 days)](docs/img/ios_history_7d_v2.png)** ← replace with actual path
 - **US-03 — Sync watch ↔ iPhone:** **Met (manual trigger)**  
   iOS `Sync & Refresh`: **`requestCatchUp()` → `reloadSamples()`**; offline retry — **basic** (to verify).
 
